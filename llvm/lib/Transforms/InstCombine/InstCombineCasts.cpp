@@ -684,9 +684,44 @@ static Instruction *shrinkInsertElt(CastInst &Trunc,
   return nullptr;
 }
 
+/// Whenever a scalar is extracted from a vector, and then truncated,
+/// convert it to an extractelement then bitcast.
+/// 
+/// Example (little endian):
+///   trunc (extractelement <4 x i64> %X, 0) to i32
+///   --->
+///   extractelement <8 x i32> (bitcast <4 x i64> %X to <8 x i32>), i32 0
+static Instruction *shrinkExtractElt(TruncInst &Trunc,
+                                     InstCombiner::BuilderTy &Builder, bool IsBigEndian) {
+  // TODO: Combine this function with foldVecTruncToExtElt?
+  Type *DestTy = Trunc.getType();
+
+  if (auto *ExtElt = dyn_cast<ExtractElementInst>(Trunc.getOperand(0))) {
+    Value *Src = ExtElt->getVectorOperand();
+    Type *SrcTy = Src->getType();
+    unsigned Scale =
+          SrcTy->getScalarSizeInBits() / DestTy->getScalarSizeInBits();
+
+    unsigned SrcIdx = IsBigEndian ? Scale - 1 : 0;
+    assert(0 <= SrcIdx && SrcIdx < Scale);
+    
+    if (match(ExtElt->getIndexOperand(), m_SpecificInt(SrcIdx))) {
+      unsigned Scale =
+          SrcTy->getScalarSizeInBits() / DestTy->getScalarSizeInBits();
+      unsigned BitCastNumElts = Scale * SrcTy->getVectorNumElements();
+      Type *BitCastTy = VectorType::get(DestTy, BitCastNumElts);
+      Value *BitCast = Builder.CreateBitCast(Src, BitCastTy);
+      return ExtractElementInst::Create(BitCast, Builder.getInt32(0));
+    }
+  }
+  return nullptr;
+}
+
 Instruction *InstCombiner::visitTrunc(TruncInst &CI) {
   if (Instruction *Result = commonCastTransforms(CI))
     return Result;
+
+  dbgs() << "[dsprenkels] visiting Trunc: " << CI << '\n';
 
   Value *Src = CI.getOperand(0);
   Type *DestTy = CI.getType(), *SrcTy = Src->getType();
@@ -820,6 +855,10 @@ Instruction *InstCombiner::visitTrunc(TruncInst &CI) {
 
   if (Instruction *I = shrinkInsertElt(CI, Builder))
     return I;
+  
+  if (Instruction *I = shrinkExtractElt(CI, Builder, DL.isBigEndian())) {
+    return I;
+  }
 
   if (Src->hasOneUse() && isa<IntegerType>(SrcTy) &&
       shouldChangeType(SrcTy, DestTy)) {

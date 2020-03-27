@@ -162,6 +162,7 @@ Instruction *InstCombiner::scalarizePHI(ExtractElementInst &EI, PHINode *PN) {
   return &EI;
 }
 
+/// TODO(dsprenkels) Add a doc-comment for this function.
 static Instruction *foldBitcastExtElt(ExtractElementInst &Ext,
                                       InstCombiner::BuilderTy &Builder,
                                       bool IsBigEndian) {
@@ -367,6 +368,7 @@ Instruction *InstCombiner::visitExtractElementInst(ExtractElementInst &EI) {
       }
     }
     if (Instruction *I = foldBitcastExtElt(EI, Builder, DL.isBigEndian()))
+      // NOTE(dsprenkels) `DL` is "data layout".
       return I;
 
     // If there's a vector PHI feeding a scalar use through this extractelement

@@ -296,7 +296,9 @@ public:
   //
   // Note that you MUST override this function if your return type is not void.
   //
-  void visitInstruction(Instruction &I) {}  // Ignore unhandled instructions
+  void visitInstruction(Instruction &I) {
+    dbgs() << "[dsprenkels] visiting Instruction fallback: " << I << '\n';
+  }  // Ignore unhandled instructions
 
 private:
   // Special helper function to delegate to CallInst subclass visitors.
