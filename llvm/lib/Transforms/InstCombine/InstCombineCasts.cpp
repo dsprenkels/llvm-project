@@ -693,7 +693,7 @@ static Instruction *shrinkInsertElt(CastInst &Trunc,
 ///   extractelement <8 x i32> (bitcast <4 x i64> %X to <8 x i32>), i32 0
 static Instruction *shrinkExtractElt(TruncInst &Trunc,
                                      InstCombiner::BuilderTy &Builder, bool IsBigEndian) {
-  // TODO: Combine this function with foldVecTruncToExtElt?
+  // TODO(dsprenkels) Do not emit extractelement, but emit a shuffle.
   Type *DestTy = Trunc.getType();
 
   if (auto *ExtElt = dyn_cast<ExtractElementInst>(Trunc.getOperand(0))) {
